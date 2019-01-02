@@ -1,0 +1,19 @@
+language: csharp
+sudo: required
+dist: trusty
+
+dotnet: 2.1.401
+mono:
+  - latest # => "stable release"
+os:
+  - linux
+
+addons:
+  apt:
+    packages:
+    - dotnet-sharedframework-microsoft.netcore.app-1.1.2
+
+script:
+  - dotnet restore
+  - dotnet test tests/Tests
+

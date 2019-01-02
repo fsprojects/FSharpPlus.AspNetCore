@@ -1,0 +1,47 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Title>FSharpPlus.AspNetCore.Suave</Title>
+    <Description>FSharpPlus.AspNetCore.Suave does the thing!</Description>
+    <!-- summary is not migrated from project.json, but you can use the <Description> property for that if needed. -->
+    <PackageTags>f#, fsharp</PackageTags>
+    <PackageProjectUrl>https://github.com/wallymathieu/FSharpPlus.AspNetCore</PackageProjectUrl>
+    <PackageLicenseUrl>https://github.com/wallymathieu/FSharpPlus.AspNetCore/blob/master/LICENSE.md</PackageLicenseUrl>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <RepositoryType>git</RepositoryType>
+    <Authors>wallymathieu</Authors>
+    <RepositoryUrl>https://github.com/wallymathieu/FSharpPlus.AspNetCore</RepositoryUrl>
+    <!-- owners is not supported in MSBuild -->
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <Optimize>true</Optimize>
+    <Tailcalls>true</Tailcalls>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Library.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+      <PackageReference Include="FSharpPlus" Version="1.1.0-CI00252" />
+      <PackageReference Include="Microsoft.AspNetCore.Http" Version="2.0.*" />
+      <PackageReference Include="Microsoft.AspNetCore" Version="2.0.*" />
+      <PackageReference Include="TaskBuilder.fs" Version="2.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FSharpPlus.AspNetCore\FSharpPlus.AspNetCore.fsproj" />
+  </ItemGroup>
+  <Import Project="..\..\fsc.props" />
+  <Import Project="..\..\netfx.props" />
+
+
+</Project>

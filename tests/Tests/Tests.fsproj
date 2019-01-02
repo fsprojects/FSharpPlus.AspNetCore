@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFrameworks>netcoreapp2.1</TargetFrameworks>
+    </PropertyGroup>
+    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+        <DebugType>embedded</DebugType>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Compile Include="AssemblyInfo.fs" />
+        <Compile Include="Tests.fs" />
+        <Compile Include="Main.fs" />
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="../../src/FSharpPlus.AspNetCore/FSharpPlus.AspNetCore.fsproj" />
+        <ProjectReference Include="../../src/FSharpPlus.AspNetCore.Suave/FSharpPlus.AspNetCore.Suave.fsproj" />
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="Fleece.FSharpData" Version="0.8.0-alpha-2" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.7.2" />
+        <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.5.0" />
+        <PackageReference Include="Expecto" Version="8.0.0" />
+    </ItemGroup>
+    <Import Project="..\..\fsc.props" />
+    <Import Project="..\..\netfx.props" />
+</Project>
