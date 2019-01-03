@@ -6,12 +6,12 @@ open System.Threading.Tasks
 open Microsoft.AspNetCore.Builder
 open System.Net
 open System.Text
+open System.Text.RegularExpressions
 
 // setup something that reminds us of what Suave can work with
 // this is an overly simplified model of Suave in order to show how OptionT can be used
 // in conjunction with generic Kleisli composition (fish) operator
 type WebPart<'a> = 'a -> OptionT<Async<'a option>>
-let inline succeed x = async.Return (Some x)
 
 module WebPart=
     /// Comment from <a href="https://github.com/SuaveIO/suave/blob/v2.4.3/src/Suave/WebPart.fsi#L39-L42">WebPart.fsi</a>
@@ -20,6 +20,7 @@ module WebPart=
     /// from the list of options, until there's a match/a Some(x) which can be
     /// run.
     let choose (options : WebPart<'a> list) = fun x -> choice (List.map ((|>) x) options)
+    let inline fail (_:'a) : OptionT<Async<'a option>> = OptionT <| async.Return None
 
 module Http=
     type Response = { statusCode : int option; content: Choice<string,byte array> option; contentType:string option}
@@ -32,6 +33,7 @@ module Http=
         let ofHttpContext (httpContext:HttpContext)=
             { request = httpContext.Request; response = Response.empty }
         let response statusCode content=
+            let succeed x = async.Return (Some x)
             OptionT << fun ctx -> { ctx with response = { ctx.response with statusCode = Some statusCode; content=Choice1Of2 content |> Some }} |> succeed
 
     let yieldToResponse (from:Response) (to':HttpResponse)=
@@ -69,7 +71,19 @@ module Filters=
     let path s =
         let path = implicit s
         OptionT << fun (x : Http.Context) -> async.Return (if (path = x.request.Path) then Some x else None)
-
+    /// note: This implementation is smaller in scope than you'd find in Giraffe or Suave
+    /// I'd prefer to use some sort of library to turn path into a match expression
+    let inline pathRegex (path) (routeHandler : 'T -> WebPart<Context>) : WebPart<Context>=
+        let regex =Regex("^"+path+"$", RegexOptions.IgnorePatternWhitespace|||RegexOptions.IgnoreCase)
+        let tryMatchInput = fun v->
+            let m = regex.Match v
+            if m.Success then tryParse m.Groups.[1].Value else None
+        fun (x : Http.Context) -> monad {
+            let pathValue = x.request.Path.Value
+            match tryMatchInput pathValue with
+            | Some args -> return! routeHandler args x
+            | None -> return! WebPart.fail x
+        }
 module Request =
     module Form=
         let tryGet name (request: HttpRequest) =

@@ -7,6 +7,16 @@ open FSharpPlus.AspNetCore
 open FSharpPlus.AspNetCore.Suave
 open Fleece.FSharpData
 open Fleece.FSharpData.Operators
+open HttpAdapter
+open Microsoft.AspNetCore.Builder
+open Microsoft.AspNetCore.Hosting
+open Microsoft.AspNetCore.Http
+open System.Threading.Tasks
+open Microsoft.AspNetCore.TestHost
+open FSharp.Control.Tasks.V2
+open System.Net.Http
+open System.Text
+open System.Collections.Generic
 
 let authenticated (f: Http.Context -> int -> OptionT<Async<'a option>>) =
     // we assume that authenticated executes f only if auth, otherwise returns 401
@@ -24,6 +34,8 @@ type Note with
         <!> jreq  "id"          (fun x -> Some x.id    )
         <*> jreq  "text"        (fun x -> Some x.text  )
         |> Codec.ofConcrete
+module Note=
+    let id (n:Note)=n.id
 type NoteList = { notes: Note list; offset: int; chunk: int; total: int }
 type NoteList with
     static member JsonObjCodec =
@@ -37,12 +49,20 @@ type NoteList with
 type IDb =
     abstract member GetUserNotes: int -> Async<NoteList>
     abstract member AddUserNote: int -> string -> Async<Note>
+    abstract member GetNote: int ->Async<Note option>
 
 let webApp (db: IDb) =
     let overview =
         GET >=> (authenticated <| fun ctx userId ->
             monad {
               let! res = lift (db.GetUserNotes userId)
+              let ovm = toJson res |> string
+              return! OK ovm ctx
+            })
+    let getNote (id)=
+        GET >=> (fun ctx ->
+            monad {
+              let! res = lift (db.GetNote id)
               let ovm = toJson res |> string
               return! OK ovm ctx
             })
@@ -59,20 +79,8 @@ let webApp (db: IDb) =
             })
     WebPart.choose [ path "/" >=> (OK "/")
                      path "/notes" >=> register
+                     pathRegex "/notes/(\\d+)" getNote
                      path "/notes" >=> overview ]
-open HttpAdapter
-open Microsoft.AspNetCore.Builder
-open Microsoft.AspNetCore.Hosting
-open Microsoft.AspNetCore.Http
-open Microsoft.Extensions.DependencyInjection
-open System.Threading.Tasks
-open Microsoft.AspNetCore.Hosting
-open Microsoft.AspNetCore.TestHost
-open FSharp.Control.Tasks.V2
-open System.Net.Http
-open System.Text
-open FSharp.Data
-open System.Collections.Generic
 
 module HttpAdapter=
     let indexHtml = """
@@ -111,6 +119,9 @@ module ``integration test using test server`` =
                 let note = {id=notes.Length+1; text=note}
                 notes<-(userId,note) :: notes
                 async { return note }
+               member __.GetNote id=
+                let note = List.tryFind ((=) id << Note.id<< snd) notes |> Option.map snd
+                async { return note }
             }
         let create ()=
             let svc = fakeDb()
@@ -142,5 +153,13 @@ module ``integration test using test server`` =
             let! resp= client |> get "/api/notes"
             let! notesJson = resp.Content.ReadAsStringAsync()
             Expect.equal (parseJson notesJson) (Ok {notes=[{id=1;text="my text"}];chunk=100; offset=0;total=1}) "Expected notes json"
+        })
+        testCase "Read a single note" <| fun _ ->waitFor(task {
+            use testServer = TestServer.create()
+            use client = testServer.CreateClient()
+            let! _ = client |> postForm "/api/notes" [("text","my text")]
+            let! resp= client |> get "/api/notes/1"
+            let! noteJson = resp.Content.ReadAsStringAsync()
+            Expect.equal (parseJson noteJson) (Ok {id=1;text="my text"}) "Expected note json"
         })
       ]
