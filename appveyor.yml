@@ -3,6 +3,8 @@ init:
 build_script:
   - cmd: dotnet restore
   - cmd: dotnet test tests\Tests
+  - cmd: dotnet pack src\FSharpPlus.AspNetCore -o ../../dist -c Release
+  - cmd: dotnet pack src\FSharpPlus.AspNetCore.Suave -o ../../dist -c Release
 test: "off"
 version: 0.0.1.{build}
 artifacts:
