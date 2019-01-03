@@ -26,7 +26,6 @@
     <Tailcalls>true</Tailcalls>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Library.fs" />
   </ItemGroup>
   <ItemGroup>
@@ -34,6 +33,4 @@
       <PackageReference Include="Microsoft.AspNetCore.Http" Version="2.0.*" />
       <PackageReference Include="Microsoft.AspNetCore" Version="2.0.*" />
   </ItemGroup>
-  <Import Project="..\..\fsc.props" />
-  <Import Project="..\..\netfx.props" />
 </Project>

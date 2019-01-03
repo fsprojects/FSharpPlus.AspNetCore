@@ -17,3 +17,6 @@ script:
   - dotnet restore
   - dotnet test tests/Tests
 
+branches:
+  only:
+  - master
