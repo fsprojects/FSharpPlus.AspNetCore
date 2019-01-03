@@ -1,32 +1,65 @@
 module Tests
 
-open FSharpPlus
-open FSharpPlus.Data
-open Expecto
-open FSharpPlus.AspNetCore
-open FSharpPlus.AspNetCore.Suave
-open Fleece.FSharpData
-open Fleece.FSharpData.Operators
-open HttpAdapter
-open Microsoft.AspNetCore.Builder
-open Microsoft.AspNetCore.Hosting
-open Microsoft.AspNetCore.Http
-open System.Threading.Tasks
-open Microsoft.AspNetCore.TestHost
-open FSharp.Control.Tasks.V2
+open System
 open System.Net.Http
 open System.Text
 open System.Collections.Generic
+open System.Threading.Tasks
 
-let authenticated (f: Http.Context -> int -> OptionT<Async<'a option>>) =
-    // we assume that authenticated executes f only if auth, otherwise returns 401
-    // we fake it as:
-    fun (ctx: Http.Context) -> f ctx -1
+open FSharpPlus
+open FSharpPlus.Data
 
-// Usage:
+open Fleece.FSharpData
+open Fleece.FSharpData.Operators
+
+open Microsoft.AspNetCore.Builder
+open Microsoft.AspNetCore.Hosting
+open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.TestHost
+
+open Expecto
+
+open FSharp.Control.Tasks.V2
+
+open FSharpPlus.AspNetCore
+open FSharpPlus.AspNetCore.Suave
+open HttpAdapter
 open Successful
 open RequestErrors
 open Filters
+open Writers
+
+type JwtPayload = { subject:string }
+with
+  static member OfJson json:ParseResult<JwtPayload> =
+    let create sub= { subject =sub }
+    match json with
+    | JObject o -> create <!> (o .@ "sub")
+    | x -> Decode.Fail.objExpected x
+let authenticated f =
+  fun (ctx:Http.Context) ->
+    match Request.Header.tryGet "x-jwt-payload" ctx.request with
+    | Some u ->
+      string u
+      |> Convert.FromBase64String
+      |> Encoding.UTF8.GetString
+      |> parseJson
+      |> Result.map( fun (payload:JwtPayload)->tryParse payload.subject)
+      |> function | Ok (Some user)-> f ctx user
+                  | _ -> UNAUTHORIZED "" ctx
+    | None -> UNAUTHORIZED "" ctx
+
+module Json=
+  let inline OK v=
+    OK (string v)
+    >=> setContentType "application/json; charset=utf-8"
+  let inline CREATED v=
+    CREATED (string v)
+    >=> setContentType "application/json; charset=utf-8"
+  let inline BAD_REQUEST v =
+    BAD_REQUEST (string v)
+    >=> setContentType "application/json; charset=utf-8"
+
 type Note = { id: int; text: string }
 type Note with
     static member JsonObjCodec =
@@ -57,14 +90,14 @@ let webApp (db: IDb) =
             monad {
               let! res = lift (db.GetUserNotes userId)
               let ovm = toJson res |> string
-              return! OK ovm ctx
+              return! Json.OK ovm ctx
             })
     let getNote (id)=
         GET >=> (fun ctx ->
             monad {
               let! res = lift (db.GetNote id)
               let ovm = toJson res |> string
-              return! OK ovm ctx
+              return! Json.OK ovm ctx
             })
     let register =
         POST >=> hasFormContentType >=> (authenticated <| fun ctx userId ->
@@ -73,7 +106,7 @@ let webApp (db: IDb) =
               | Some text ->
                   let! newNote = lift (db.AddUserNote userId (string text))
                   let rvm = toJson newNote |> string
-                  return! CREATED rvm ctx
+                  return! Json.CREATED rvm ctx
               | None ->
                   return! BAD_REQUEST "Could not find text" ctx
             })
@@ -129,11 +162,19 @@ module ``integration test using test server`` =
                             .Configure(fun app->HttpAdapter.configuration svc app)
             new TestServer(builder)
     let waitFor (t:Task)= t.Wait()
+    //echo '{"sub":"1"}' | base64
+    let base64Encode : string -> string = Encoding.UTF8.GetBytes>>Convert.ToBase64String
+    let setAuth (client:HttpClient) =
+        client.DefaultRequestHeaders.Remove "x-jwt-payload" |> ignore
+        client.DefaultRequestHeaders.Add("x-jwt-payload", base64Encode "{\"sub\":\"1\"}")
     let postJson path content (client:HttpClient)=
+        setAuth client
         client.PostAsync("http://localhost"+path, new StringContent(content,Encoding.UTF8,"application/json"))
     let postForm path content (client:HttpClient)=
+        setAuth client
         client.PostAsync("http://localhost"+path, new FormUrlEncodedContent(content |> List.map (fun (k,v)-> KeyValuePair.Create(k,v))))
     let get path (client:HttpClient)=
+        setAuth client
         client.GetAsync("http://localhost"+path)
     [<Tests>]
     let tests =
