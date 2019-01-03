@@ -1,15 +1,11 @@
 ﻿module FSharpPlus.AspNetCore.Suave
-open FSharpPlus.AspNetCore
 open FSharpPlus
 open FSharpPlus.Data
-open System
 open Microsoft.AspNetCore.Http
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Builder
-open Microsoft.AspNetCore.Hosting
-open Microsoft.AspNetCore.Http
-open Microsoft.Extensions.DependencyInjection
-open System.Threading.Tasks
+open System.Net
+open System.Text
 
 // setup something that reminds us of what Suave can work with
 // this is an overly simplified model of Suave in order to show how OptionT can be used
@@ -26,36 +22,50 @@ module WebPart=
     let choose (options : WebPart<'a> list) = fun x -> choice (List.map ((|>) x) options)
 
 module Http=
-    type Response = { statusCode : int option; content:string option; contentType:string option}
+    type Response = { statusCode : int option; content: Choice<string,byte array> option; contentType:string option}
+
+    type Context = { request:HttpRequest; response:Response }
     module Response=
         let empty = { statusCode=None; content=None; contentType=None }
-    //type HttpRequest = { url : Uri; ``method``:string }
-    type Context = { request:HttpRequest; response:Response }
+
     module Context=
         let ofHttpContext (httpContext:HttpContext)=
             { request = httpContext.Request; response = Response.empty }
+        let response statusCode content=
+            OptionT << fun ctx -> { ctx with response = { ctx.response with statusCode = Some statusCode; content=Choice1Of2 content |> Some }} |> succeed
+
     let yieldToResponse (from:Response) (to':HttpResponse)=
         match from.contentType with | Some contentType -> to'.ContentType <- contentType | _ -> ()
         match from.statusCode with | Some statusCode -> to'.StatusCode <- statusCode | _ -> ()
-        match from.content with | Some content -> to'.WriteAsync(content) | _ -> Task.CompletedTask
-
+        match from.content with
+        | Some (Choice1Of2 content) -> to'.WriteAsync(content)
+        | Some (Choice2Of2 content) -> to'.WriteAsync(Encoding.UTF8.GetString(content), Encoding.UTF8)
+        | _ -> Task.CompletedTask
+open Http
 module Successful=
-    open Http
-    let private withStatusCode statusCode s=
-        OptionT << fun ctx -> { ctx with response = { ctx.response with statusCode = Some statusCode; content = Some s }} |> succeed
-    let OK s = withStatusCode 200 s
-    let BAD_REQUEST s = withStatusCode 400 s
-
+    let OK s = Context.response (int HttpStatusCode.OK) s
+    let ACCEPTED s = Context.response (int HttpStatusCode.Accepted) s
+    let CREATED s = Context.response (int HttpStatusCode.Created) s
+    let NO_CONTENT s = Context.response (int HttpStatusCode.NoContent) s
+module RequestErrors=
+    let BAD_REQUEST s = Context.response (int HttpStatusCode.BadRequest) s
+    let NOT_ACCEPTABLE s = Context.response (int HttpStatusCode.NotAcceptable) s
+    let METHOD_NOT_ALLOWED s = Context.response (int HttpStatusCode.MethodNotAllowed) s
+    let FORBIDDEN s = Context.response (int HttpStatusCode.Forbidden) s
+    let NOT_FOUND s = Context.response (int HttpStatusCode.NotFound) s
+    let UNAUTHORIZED s = Context.response (int HttpStatusCode.Unauthorized) s
 module Filters=
-    open Http
-    let ``method`` (m : string) =
-        OptionT << fun (x : Http.Context) -> async.Return (if (m = x.request.Method) then Some x else None)
-    let GET  (x : Http.Context) = ``method`` "GET" x
-    let POST (x : Http.Context) = ``method`` "POST" x
-    let DELETE (x : Http.Context) = ``method`` "DELETE" x
-    let HEAD (x : Http.Context) = ``method`` "HEAD" x
-    let OPTIONS (x : Http.Context) = ``method`` "OPTIONS" x
-    let PATCH (x : Http.Context) = ``method`` "PATCH" x
+    let response (method : string) =
+        OptionT << fun (x : Context) -> async.Return (if (method = x.request.Method) then Some x else None)
+    let hasFormContentType =
+        OptionT << fun (x : Context) -> async.Return (if x.request.HasFormContentType then Some x else None)
+
+    let GET  (x : Http.Context) =  response "GET" x
+    let POST (x : Http.Context) = response "POST" x
+    let DELETE (x : Http.Context) = response "DELETE" x
+    let HEAD (x : Http.Context) = response "HEAD" x
+    let OPTIONS (x : Http.Context) = response "OPTIONS" x
+    let PATCH (x : Http.Context) = response "PATCH" x
     let path s =
         let path = implicit s
         OptionT << fun (x : Http.Context) -> async.Return (if (path = x.request.Path) then Some x else None)
@@ -71,14 +81,17 @@ module Request =
             match request.Query.TryGetValue name with
             | true, v -> Some v
             | _       -> None
-let yieldTo (from:Http.Context) (to':HttpContext)= Http.yieldToResponse from.response to'.Response
-open Http
 open FSharp.Control.Tasks.V2
 let appRun (app:WebPart<Context>) (appBuilder:IApplicationBuilder)=
+    let appRun (func:HttpContext->#Task) (b: IApplicationBuilder) =
+        b.Run(RequestDelegate(fun ctx->func ctx :> Task))
+
     let runApp context = task {
         let ctx = Context.ofHttpContext context
-        let task = app ctx |> OptionT.run |> Async.StartAsTask
-        match! task with | Some res-> return! yieldTo res context | None -> return! Task.CompletedTask
+        let! task = app ctx |> OptionT.run |> Async.StartAsTask
+        match task with
+        | Some res-> return! Http.yieldToResponse res.response context.Response
+        | None -> return! Task.CompletedTask
     }
-    HttpAdapter.appRun runApp appBuilder
+    appRun runApp appBuilder
 
