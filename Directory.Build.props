@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PackageTags>f#, fsharp, f#+, fsharpplus, aspnetcore</PackageTags>
+    <PackageProjectUrl>https://github.com/wallymathieu/FSharpPlus.AspNetCore</PackageProjectUrl>
+    <PackageLicenseUrl>https://github.com/wallymathieu/FSharpPlus.AspNetCore/blob/master/LICENSE.md</PackageLicenseUrl>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <RepositoryType>git</RepositoryType>
+    <Authors>wallymathieu</Authors>
+    <RepositoryUrl>https://github.com/wallymathieu/FSharpPlus.AspNetCore</RepositoryUrl>
+
+    <WarningLevel>3</WarningLevel>
+
+    <VersionPrefix>0.0.1</VersionPrefix>
+    <VersionSuffix>alpha-1</VersionSuffix>
+    <Version Condition=" '$(VersionSuffix)' != '' ">$(VersionPrefix)-$(VersionSuffix)</Version>
+    <Version Condition=" '$(VersionSuffix)' == '' ">$(VersionPrefix)</Version>
+    <AssemblyVersion>$(VersionPrefix).0</AssemblyVersion>
+    <FileVersion>$(VersionPrefix).0</FileVersion>
+  </PropertyGroup>
+</Project>
