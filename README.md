@@ -1,6 +1,6 @@
 # FSharpPlus.AspNetCore
 
-F#+ bindings for asp.net core. This is intended to enable development of web api:s leveraging F#+ and asp.net core.
+[F#+](https://github.com/fsprojects/FSharpPlus) bindings for [asp.net core](https://github.com/fsprojects/FSharpPlus). This is intended to enable development of web api:s leveraging F#+ and asp.net core.
 
 ---
 
@@ -8,7 +8,7 @@ F#+ bindings for asp.net core. This is intended to enable development of web api
 
 MacOS/Linux | Windows
 --- | ---
-[![Travis Badge](https://travis-ci.org/wallymathieu/FSharpPlus.AspNetCore.svg?branch=master)](https://travis-ci.org/wallymathieu/FSharpPlus.AspNetCore) | [![Build status](https://ci.appveyor.com/api/projects/status/github/wallymathieu/fsharpplus-aspnetcore?svg=true)](https://ci.appveyor.com/project/wallymathieu/fsharpplus-aspnetcore)
+[![Travis Badge](https://travis-ci.org/wallymathieu/FSharpPlus.AspNetCore.svg?branch=master)](https://travis-ci.org/wallymathieu/FSharpPlus.AspNetCore) | [![Build status](https://ci.appveyor.com/api/projects/status/4sfk5c67p698aobx/branch/master?svg=true)](https://ci.appveyor.com/project/wallymathieu/fsharpplus-aspnetcore)
 [![Build History](https://buildstats.info/travisci/chart/wallymathieu/FSharpPlus.AspNetCore)](https://travis-ci.org/wallymathieu/FSharpPlus.AspNetCore/builds) | [![Build History](https://buildstats.info/appveyor/chart/wallymathieu/fsharpplus-aspnetcore)](https://ci.appveyor.com/project/wallymathieu/fsharpplus-aspnetcore)
 
 
