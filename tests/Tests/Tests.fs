@@ -92,11 +92,18 @@ let webApp (db: IDb) =
               let ovm = toJson res |> string
               return! Json.OK ovm ctx
             })
-    let getNote (id)=
+    let getNote (id:int)=
         GET >=> (fun ctx ->
             monad {
               let! res = lift (db.GetNote id)
               let ovm = toJson res |> string
+              return! Json.OK ovm ctx
+            })
+    let getNotePart (id:int) (part:int)=
+        GET >=> (fun ctx ->
+            monad {
+              let! res = lift (db.GetNote id)
+              let ovm = res |> map(fun (n:Note)-> n.text.Substring(0,part)) |> toJson |> string
               return! Json.OK ovm ctx
             })
     let register =
@@ -113,6 +120,7 @@ let webApp (db: IDb) =
     WebPart.choose [ path "/" >=> (OK "/")
                      path "/notes" >=> register
                      pathRegex "/notes/(\\d+)" getNote
+                     pathRegex2 "/notes/(\\d+)/_/(\\d+)" getNotePart
                      path "/notes" >=> overview ]
 
 module HttpAdapter=
@@ -202,5 +210,13 @@ module ``integration test using test server`` =
             let! resp= client |> get "/api/notes/1"
             let! noteJson = resp.Content.ReadAsStringAsync()
             Expect.equal (parseJson noteJson) (Ok {id=1;text="my text"}) "Expected note json"
+        })
+        testCase "Read a part of a note" <| fun _ ->waitFor(task {
+            use testServer = TestServer.create()
+            use client = testServer.CreateClient()
+            let! _ = client |> postForm "/api/notes" [("text","my text")]
+            let! resp= client |> get "/api/notes/1/_/2"
+            let! noteJson = resp.Content.ReadAsStringAsync()
+            Expect.equal noteJson "\"my\"" "Expected text"
         })
       ]

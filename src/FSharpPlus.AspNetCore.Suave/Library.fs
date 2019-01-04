@@ -103,7 +103,7 @@ module Filters=
     /// note: This implementation is smaller in scope than you'd find in Giraffe or Suave
     /// I'd prefer to use some sort of library to turn path into a match expression
     let inline pathRegex (path) (routeHandler : 'T -> WebPart<Context>) : WebPart<Context>=
-        let regex =Regex("^"+path+"$", RegexOptions.IgnorePatternWhitespace|||RegexOptions.IgnoreCase)
+        let regex =Regex("^"+path+"$", RegexOptions.IgnoreCase)
         let tryMatchInput = fun v->
             let m = regex.Match v
             if m.Success then tryParse m.Groups.[1].Value else None
@@ -113,6 +113,21 @@ module Filters=
             | Some args -> return! routeHandler args x
             | None -> return! WebPart.fail x
         }
+    /// note: This implementation is smaller in scope than you'd find in Giraffe or Suave
+    /// I'd prefer to use some sort of library to turn path into a match expression
+    let inline pathRegex2 (path) (routeHandler : 'T1 -> 'T2 -> WebPart<Context>) : WebPart<Context>=
+        let regex =Regex("^"+path+"$", RegexOptions.IgnoreCase)
+        let tryMatchInput = fun v->
+            let m = regex.Match v
+            if m.Success then (tryParse m.Groups.[1].Value, tryParse m.Groups.[2].Value) else None,None
+        fun (x : Http.Context) -> monad {
+            let pathValue = x.request.Path.Value
+            match tryMatchInput pathValue with
+            | Some args1, Some args2 -> return! routeHandler args1 args2 x
+            | _ -> return! WebPart.fail x
+        }
+
+
 module Request =
     module Form=
         let tryGet name (request: HttpRequest) =
