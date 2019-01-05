@@ -62,69 +62,70 @@ module Json=
 
 type Note = { id: int; text: string }
 type Note with
-    static member JsonObjCodec =
-        fun id text -> { id = id; text = text  }
-        <!> jreq  "id"          (fun x -> Some x.id    )
-        <*> jreq  "text"        (fun x -> Some x.text  )
-        |> Codec.ofConcrete
+  static member JsonObjCodec =
+    fun id text -> { id = id; text = text  }
+    <!> jreq  "id"          (fun x -> Some x.id    )
+    <*> jreq  "text"        (fun x -> Some x.text  )
+    |> Codec.ofConcrete
 module Note=
-    let id (n:Note)=n.id
+  let id (n:Note)=n.id
 type NoteList = { notes: Note list; offset: int; chunk: int; total: int }
 type NoteList with
-    static member JsonObjCodec =
-        fun notes offset chunk total -> { notes = notes; offset = offset; chunk = chunk; total=total  }
-        <!> jreq  "notes"          (fun x -> Some x.notes     )
-        <*> jreq  "offset"         (fun x -> Some x.offset    )
-        <*> jreq  "chunk"          (fun x -> Some x.chunk     )
-        <*> jreq  "total"          (fun x -> Some x.total     )
-        |> Codec.ofConcrete
+  static member JsonObjCodec =
+    fun notes offset chunk total -> { notes = notes; offset = offset; chunk = chunk; total=total  }
+    <!> jreq  "notes"          (fun x -> Some x.notes     )
+    <*> jreq  "offset"         (fun x -> Some x.offset    )
+    <*> jreq  "chunk"          (fun x -> Some x.chunk     )
+    <*> jreq  "total"          (fun x -> Some x.total     )
+    |> Codec.ofConcrete
 
 type IDb =
-    abstract member GetUserNotes: int -> Async<NoteList>
-    abstract member AddUserNote: int -> string -> Async<Note>
-    abstract member GetNote: int ->Async<Note option>
+  abstract member GetUserNotes: int -> Async<NoteList>
+  abstract member AddUserNote: int -> string -> Async<Note>
+  abstract member GetNote: int ->Async<Note option>
 
 let webApp (db: IDb) =
-    let overview =
-        GET >=> (authenticated <| fun ctx userId ->
-            monad {
-              let! res = lift (db.GetUserNotes userId)
-              let ovm = toJson res |> string
-              return! Json.OK ovm ctx
-            })
-    let getNote (id:int)=
-        GET >=> (fun ctx ->
-            monad {
-              let! res = lift (db.GetNote id)
-              let ovm = toJson res |> string
-              return! Json.OK ovm ctx
-            })
-    let getNotePart (id:int) (part:int)=
-        GET >=> (fun ctx ->
-            monad {
-              let! res = lift (db.GetNote id)
-              let ovm = res |> map(fun (n:Note)-> n.text.Substring(0,part)) |> toJson |> string
-              return! Json.OK ovm ctx
-            })
-    let register =
-        POST >=> hasFormContentType >=> (authenticated <| fun ctx userId ->
-            monad {
-              match ctx.request |> Request.Form.tryGet "text" with
-              | Some text ->
-                  let! newNote = lift (db.AddUserNote userId (string text))
-                  let rvm = toJson newNote |> string
-                  return! Json.CREATED rvm ctx
-              | None ->
-                  return! BAD_REQUEST "Could not find text" ctx
-            })
+  let overview =
+    GET >=> (authenticated <| fun ctx userId -> monad {
+      let! res = lift (db.GetUserNotes userId)
+      let ovm = toJson res |> string
+      return! Json.OK ovm ctx
+    })
+  let getNote (id:int)=
+    GET >=> (fun ctx -> monad {
+      let! maybeNote = lift (db.GetNote id)
+      return! Json.OK (toJson maybeNote) ctx
+    })
+  let getNotePart (id:int) (part:int)=
+    GET >=> (fun ctx -> monad {
+      let! maybeNote = lift (db.GetNote id)
+      let json = maybeNote |> map(fun (n:Note)-> n.text.Substring(0,part)) |> toJson
+      return! Json.OK json ctx
+    })
+  let register =
+    POST >=> hasFormContentType >=> (authenticated <| fun ctx userId -> monad {
+      match ctx.request |> Request.Form.tryGet "text" with
+      | Some text ->
+        let! newNote = lift (db.AddUserNote userId (string text))
+        return! Json.CREATED (toJson newNote) ctx
+      | None ->
+        return! BAD_REQUEST "Could not find text" ctx
+    })
+
+  let v1=
     WebPart.choose [ path "/" >=> (OK "/")
                      path "/notes" >=> register
                      pathRegex "/notes/(\\d+)" getNote
                      pathRegex2 "/notes/(\\d+)/_/(\\d+)" getNotePart
                      path "/notes" >=> overview ]
-
+  let v2=
+    WebPart.choose [ path "/" >=> (OK "/")
+                     path "/notes" >=> register
+                     pathScan "/notes/%d" getNote
+                     path "/notes" >=> overview ]
+  (v1,v2)
 module HttpAdapter=
-    let indexHtml = """
+  let indexHtml = """
 <!DOCTYPE html>
 <html>
 <head>
@@ -137,86 +138,94 @@ module HttpAdapter=
 """
 
 
-    let index(context: HttpContext) : Task =
-            context.Response.ContentType <- "text/html; charset=utf-8"
-            //Console.WriteLine("Index")
-            context.Response.WriteAsync(indexHtml)
-    let configuration (svc: IDb) (app: IApplicationBuilder)=
-        app
-            |> appMap "/index.html" (appRun index)
-            |> appMap "/api" (Suave.appRun ( webApp svc ))
-            |> ignore
+  let index(context: HttpContext) : Task =
+    context.Response.ContentType <- "text/html; charset=utf-8"
+    //Console.WriteLine("Index")
+    context.Response.WriteAsync(indexHtml)
+  let configuration (svc: IDb) (app: IApplicationBuilder)=
+    let (webAppV1,webAppV2)=webApp svc
+    app
+      |> appMap "/index.html" (appRun index)
+      |> appMap "/v1" (Suave.appRun webAppV1)
+      |> appMap "/v2" (Suave.appRun webAppV2)
+      |> ignore
 
 module ``integration test using test server`` =
-    module TestServer=
-        let fakeDb() =
-            let mutable notes = []
-            { new IDb with
-               member __.GetUserNotes userId =
-                let notes = List.filter ((=) userId << fst) notes |> List.map snd
-                async{ return { notes = notes; offset = 0; chunk = 100; total=notes.Length } }
+  module TestServer=
+    let fakeDb() =
+      let mutable notes = []
+      {new IDb with
+       member __.GetUserNotes userId =
+        let notes = List.filter ((=) userId << fst) notes |> List.map snd
+        async{ return { notes = notes; offset = 0; chunk = 100; total=notes.Length } }
 
-               member __.AddUserNote userId note=
-                let note = {id=notes.Length+1; text=note}
-                notes<-(userId,note) :: notes
-                async { return note }
-               member __.GetNote id=
-                let note = List.tryFind ((=) id << Note.id<< snd) notes |> Option.map snd
-                async { return note }
-            }
-        let create ()=
-            let svc = fakeDb()
-            let builder = WebHostBuilder()
-                            .Configure(fun app->HttpAdapter.configuration svc app)
-            new TestServer(builder)
-    let waitFor (t:Task)= t.Wait()
-    //echo '{"sub":"1"}' | base64
-    let base64Encode : string -> string = Encoding.UTF8.GetBytes>>Convert.ToBase64String
-    let setAuth (client:HttpClient) =
-        client.DefaultRequestHeaders.Remove "x-jwt-payload" |> ignore
-        client.DefaultRequestHeaders.Add("x-jwt-payload", base64Encode "{\"sub\":\"1\"}")
-    let postJson path content (client:HttpClient)=
-        setAuth client
-        client.PostAsync("http://localhost"+path, new StringContent(content,Encoding.UTF8,"application/json"))
-    let postForm path content (client:HttpClient)=
-        setAuth client
-        client.PostAsync("http://localhost"+path, new FormUrlEncodedContent(content |> List.map (fun (k,v)-> KeyValuePair.Create(k,v))))
-    let get path (client:HttpClient)=
-        setAuth client
-        client.GetAsync("http://localhost"+path)
-    [<Tests>]
-    let tests =
-      testList "integration test api " [
-        testCase "Add note" <| fun _ ->waitFor(task {
-            use testServer = TestServer.create()
-            use client = testServer.CreateClient()
-            let! noteRes= client |> postForm "/api/notes" [("text","my text")]
-            Expect.equal noteRes.StatusCode System.Net.HttpStatusCode.Created "Expected created status code"
-            let! noteJson = noteRes.Content.ReadAsStringAsync()
-            Expect.equal (parseJson noteJson) (Ok {id=1;text="my text"}) "Expected note result!"
-        })
-        testCase "Read all notes" <| fun _ ->waitFor(task {
-            use testServer = TestServer.create()
-            use client = testServer.CreateClient()
-            let! _ = client |> postForm "/api/notes" [("text","my text")]
-            let! resp= client |> get "/api/notes"
-            let! notesJson = resp.Content.ReadAsStringAsync()
-            Expect.equal (parseJson notesJson) (Ok {notes=[{id=1;text="my text"}];chunk=100; offset=0;total=1}) "Expected notes json"
-        })
-        testCase "Read a single note" <| fun _ ->waitFor(task {
-            use testServer = TestServer.create()
-            use client = testServer.CreateClient()
-            let! _ = client |> postForm "/api/notes" [("text","my text")]
-            let! resp= client |> get "/api/notes/1"
-            let! noteJson = resp.Content.ReadAsStringAsync()
-            Expect.equal (parseJson noteJson) (Ok {id=1;text="my text"}) "Expected note json"
-        })
-        testCase "Read a part of a note" <| fun _ ->waitFor(task {
-            use testServer = TestServer.create()
-            use client = testServer.CreateClient()
-            let! _ = client |> postForm "/api/notes" [("text","my text")]
-            let! resp= client |> get "/api/notes/1/_/2"
-            let! noteJson = resp.Content.ReadAsStringAsync()
-            Expect.equal noteJson "\"my\"" "Expected text"
-        })
-      ]
+       member __.AddUserNote userId note=
+        let note = {id=notes.Length+1; text=note}
+        notes<-(userId,note) :: notes
+        async { return note }
+       member __.GetNote id=
+        let note = List.tryFind ((=) id << Note.id<< snd) notes |> Option.map snd
+        async { return note }
+      }
+    let create ()=
+      let svc = fakeDb()
+      let builder = WebHostBuilder()
+                      .Configure(fun app->HttpAdapter.configuration svc app)
+      new TestServer(builder)
+  let waitFor (t:Task)= t.Wait()
+  //echo '{"sub":"1"}' | base64
+  let base64Encode : string -> string = Encoding.UTF8.GetBytes>>Convert.ToBase64String
+  let setAuth (client:HttpClient) =
+    client.DefaultRequestHeaders.Remove "x-jwt-payload" |> ignore
+    client.DefaultRequestHeaders.Add("x-jwt-payload", base64Encode "{\"sub\":\"1\"}")
+  let postJson path content (client:HttpClient)=
+    setAuth client
+    client.PostAsync("http://localhost"+path, new StringContent(content,Encoding.UTF8,"application/json"))
+  let postForm path content (client:HttpClient)=
+    setAuth client
+    client.PostAsync("http://localhost"+path, new FormUrlEncodedContent(content |> List.map (fun (k,v)-> KeyValuePair.Create(k,v))))
+  let get path (client:HttpClient)=
+    setAuth client
+    client.GetAsync("http://localhost"+path)
+  let testFixture version=
+    let notesUrl = (sprintf "/v%d/notes" version)
+    [
+      testCase "Add note" <| fun _ ->waitFor(task {
+        use testServer = TestServer.create()
+        use client = testServer.CreateClient()
+        let! noteRes= client |> postForm notesUrl [("text","my text")]
+        Expect.equal noteRes.StatusCode System.Net.HttpStatusCode.Created "Expected created status code"
+        let! noteJson = noteRes.Content.ReadAsStringAsync()
+        Expect.equal (parseJson noteJson) (Ok {id=1;text="my text"}) "Expected note result!"
+      })
+      testCase "Read all notes" <| fun _ ->waitFor(task {
+        use testServer = TestServer.create()
+        use client = testServer.CreateClient()
+        let! _ = client |> postForm notesUrl [("text","my text")]
+        let! resp= client |> get notesUrl
+        let! notesJson = resp.Content.ReadAsStringAsync()
+        Expect.equal (parseJson notesJson) (Ok {notes=[{id=1;text="my text"}];chunk=100; offset=0;total=1}) "Expected notes json"
+      })
+      testCase "Read a single note" <| fun _ ->waitFor(task {
+        use testServer = TestServer.create()
+        use client = testServer.CreateClient()
+        let! _ = client |> postForm notesUrl [("text","my text")]
+        let! resp= client |> get (notesUrl+"/1")
+        let! noteJson = resp.Content.ReadAsStringAsync()
+        Expect.equal (parseJson noteJson) (Ok {id=1;text="my text"}) "Expected note json"
+      })
+    ]
+  [<Tests>]
+  let testsV1 = testList "integration test api v1" <| testFixture 1 @ [
+    testCase "Read a part of a note" <| fun _ ->waitFor(task {
+      use testServer = TestServer.create()
+      use client = testServer.CreateClient()
+      let! _ = client |> postForm "/v1/notes" [("text","my text")]
+      let! resp= client |> get "/v1/notes/1/_/2"
+      let! noteJson = resp.Content.ReadAsStringAsync()
+      Expect.equal noteJson "\"my\"" "Expected text"
+    })
+  ]
+
+  [<Tests>]
+  let testsV2 = testList "integration test api v2" <| testFixture 2

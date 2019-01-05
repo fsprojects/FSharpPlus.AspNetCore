@@ -11,11 +11,9 @@ open Microsoft.Extensions.DependencyInjection
 open System.Threading.Tasks
 
 module HttpAdapter=
-    let appMap (path: string) (map : IApplicationBuilder->unit) (app: IApplicationBuilder): IApplicationBuilder =
-        app.Map(PathString(path), Action<_>(map))
-    let appRun (func:HttpContext->#Task) (b: IApplicationBuilder) =
-        b.Run(RequestDelegate(fun ctx->func ctx :> Task))
-    let appMapWhen (when':HttpContext->bool) then' (b: IApplicationBuilder) =
-        b.MapWhen(Func<_,_>(when'), Action<_>(then'))
-
-    //let toHttpRequest (request:HttpRequest)=
+  let appMap (path: string) (map : IApplicationBuilder->unit) (app: IApplicationBuilder): IApplicationBuilder =
+    app.Map(PathString(path), Action<_>(map))
+  let appRun (func:HttpContext->#Task) (b: IApplicationBuilder) =
+    b.Run(RequestDelegate(fun ctx->func ctx :> Task))
+  let appMapWhen (when':HttpContext->bool) then' (b: IApplicationBuilder) =
+    b.MapWhen(Func<_,_>(when'), Action<_>(then'))
