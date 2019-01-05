@@ -92,6 +92,7 @@ module Filters=
 
   let GET  (x : Http.Context) =  response "GET" x
   let POST (x : Http.Context) = response "POST" x
+  let PUT (x : Http.Context) = response "PUT" x
   let DELETE (x : Http.Context) = response "DELETE" x
   let HEAD (x : Http.Context) = response "HEAD" x
   let OPTIONS (x : Http.Context) = response "OPTIONS" x

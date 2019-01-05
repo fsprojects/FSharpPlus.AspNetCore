@@ -59,8 +59,18 @@ module Json=
   let inline BAD_REQUEST v =
     BAD_REQUEST (string v)
     >=> setContentType "application/json; charset=utf-8"
+[<Struct>]
+type UserId = UserId of string
+with
+  override this.ToString()=match this with UserId uId->uId
+[<Struct>]
+type NoteId = NoteId of int
+with
+  override this.ToString()=match this with NoteId nId -> nId.ToString()
+  static member ToJson (NoteId x) = JNumber (decimal x)
+  static member OfJson json = ofJson json |> Result.map NoteId
+type Note = { id: NoteId; text: string }
 
-type Note = { id: int; text: string }
 type Note with
   static member JsonObjCodec =
     fun id text -> { id = id; text = text  }
@@ -80,25 +90,26 @@ type NoteList with
     |> Codec.ofConcrete
 
 type IDb =
-  abstract member GetUserNotes: int -> Async<NoteList>
-  abstract member AddUserNote: int -> string -> Async<Note>
-  abstract member GetNote: int ->Async<Note option>
+  abstract member GetUserNotes: UserId -> Async<NoteList>
+  abstract member AddUserNote: UserId -> string -> Async<Note>
+  abstract member GetNote: NoteId ->Async<Note option>
+  abstract member UpdateUserNote: UserId -> NoteId -> string -> Async<Note option>
 
 let webApp (db: IDb) =
   let overview =
     GET >=> (authenticated <| fun ctx userId -> monad {
-      let! res = lift (db.GetUserNotes userId)
+      let! res = lift (db.GetUserNotes <| UserId userId)
       let ovm = toJson res |> string
       return! Json.OK ovm ctx
     })
   let getNote (id:int)=
     GET >=> (fun ctx -> monad {
-      let! maybeNote = lift (db.GetNote id)
+      let! maybeNote = lift (db.GetNote <| NoteId id)
       return! Json.OK (toJson maybeNote) ctx
     })
   let getNotePart (id:int) (part:int)=
     GET >=> (fun ctx -> monad {
-      let! maybeNote = lift (db.GetNote id)
+      let! maybeNote = lift (db.GetNote <| NoteId id)
       let json = maybeNote |> map(fun (n:Note)-> n.text.Substring(0,part)) |> toJson
       return! Json.OK json ctx
     })
@@ -106,12 +117,21 @@ let webApp (db: IDb) =
     POST >=> hasFormContentType >=> (authenticated <| fun ctx userId -> monad {
       match ctx.request |> Request.Form.tryGet "text" with
       | Some text ->
-        let! newNote = lift (db.AddUserNote userId (string text))
+        let! newNote = lift (db.AddUserNote (UserId userId) (string text))
         return! Json.CREATED (toJson newNote) ctx
       | None ->
         return! BAD_REQUEST "Could not find text" ctx
     })
-
+  let updateNote (id:int) =
+    PUT >=> hasFormContentType >=> (authenticated <| fun ctx userId -> monad {
+      match ctx.request |> Request.Form.tryGet "text" with
+      | Some text ->
+        match! lift (db.UpdateUserNote (UserId userId) (NoteId id) (string text)) with
+        | Some note-> return! Json.OK (toJson note) ctx
+        | None -> return! NOT_FOUND "Could not find note" ctx
+      | None ->
+        return! BAD_REQUEST "Could not find text" ctx
+    })
   let v1=
     WebPart.choose [ path "/" >=> (OK "/")
                      path "/notes" >=> register
@@ -122,6 +142,7 @@ let webApp (db: IDb) =
     WebPart.choose [ path "/" >=> (OK "/")
                      path "/notes" >=> register
                      pathScan "/notes/%d" getNote
+                     pathScan "/notes/%d" updateNote
                      path "/notes" >=> overview ]
   (v1,v2)
 module HttpAdapter=
@@ -153,18 +174,28 @@ module HttpAdapter=
 module ``integration test using test server`` =
   module TestServer=
     let fakeDb() =
+      let withUserId userId = (=) userId << fst
+      let withId id = (=) id << Note.id<< snd
       let mutable notes = []
       {new IDb with
        member __.GetUserNotes userId =
-        let notes = List.filter ((=) userId << fst) notes |> List.map snd
+        let notes = List.filter (withUserId userId) notes |> List.map snd
         async{ return { notes = notes; offset = 0; chunk = 100; total=notes.Length } }
 
-       member __.AddUserNote userId note=
-        let note = {id=notes.Length+1; text=note}
+       member __.AddUserNote userId text=
+        let note = {id=NoteId <| notes.Length+1; text=text}
         notes<-(userId,note) :: notes
         async { return note }
+       member __.UpdateUserNote userId id text=
+        let maybeNote = List.tryFind (withId id) notes |> Option.map snd
+        match maybeNote with
+        | Some note->
+          let nextNote = {note with text=text }
+          notes<-(userId,note) :: List.filter (not << withId id) notes
+          async.Return <| Some nextNote
+        | None -> async.Return None
        member __.GetNote id=
-        let note = List.tryFind ((=) id << Note.id<< snd) notes |> Option.map snd
+        let note = List.tryFind (withId id) notes |> Option.map snd
         async { return note }
       }
     let create ()=
@@ -183,7 +214,10 @@ module ``integration test using test server`` =
     client.PostAsync("http://localhost"+path, new StringContent(content,Encoding.UTF8,"application/json"))
   let postForm path content (client:HttpClient)=
     setAuth client
-    client.PostAsync("http://localhost"+path, new FormUrlEncodedContent(content |> List.map (fun (k,v)-> KeyValuePair.Create(k,v))))
+    client.PostAsync("http://localhost"+path, new FormUrlEncodedContent(content |> List.map KeyValuePair.Create))
+  let putForm path content (client:HttpClient)=
+    setAuth client
+    client.PutAsync("http://localhost"+path, new FormUrlEncodedContent(content |> List.map KeyValuePair.Create))
   let get path (client:HttpClient)=
     setAuth client
     client.GetAsync("http://localhost"+path)
@@ -196,7 +230,7 @@ module ``integration test using test server`` =
         let! noteRes= client |> postForm notesUrl [("text","my text")]
         Expect.equal noteRes.StatusCode System.Net.HttpStatusCode.Created "Expected created status code"
         let! noteJson = noteRes.Content.ReadAsStringAsync()
-        Expect.equal (parseJson noteJson) (Ok {id=1;text="my text"}) "Expected note result!"
+        Expect.equal (parseJson noteJson) (Ok {id=NoteId 1;text="my text"}) "Expected note result!"
       })
       testCase "Read all notes" <| fun _ ->waitFor(task {
         use testServer = TestServer.create()
@@ -204,7 +238,7 @@ module ``integration test using test server`` =
         let! _ = client |> postForm notesUrl [("text","my text")]
         let! resp= client |> get notesUrl
         let! notesJson = resp.Content.ReadAsStringAsync()
-        Expect.equal (parseJson notesJson) (Ok {notes=[{id=1;text="my text"}];chunk=100; offset=0;total=1}) "Expected notes json"
+        Expect.equal (parseJson notesJson) (Ok {notes=[{id=NoteId 1;text="my text"}];chunk=100; offset=0;total=1}) "Expected notes json"
       })
       testCase "Read a single note" <| fun _ ->waitFor(task {
         use testServer = TestServer.create()
@@ -212,7 +246,7 @@ module ``integration test using test server`` =
         let! _ = client |> postForm notesUrl [("text","my text")]
         let! resp= client |> get (notesUrl+"/1")
         let! noteJson = resp.Content.ReadAsStringAsync()
-        Expect.equal (parseJson noteJson) (Ok {id=1;text="my text"}) "Expected note json"
+        Expect.equal (parseJson noteJson) (Ok {id=NoteId 1;text="my text"}) "Expected note json"
       })
     ]
   [<Tests>]
@@ -228,4 +262,13 @@ module ``integration test using test server`` =
   ]
 
   [<Tests>]
-  let testsV2 = testList "integration test api v2" <| testFixture 2
+  let testsV2 = testList "integration test api v2" <| testFixture 2 @ [
+    testCase "Update a note" <| fun _ ->waitFor(task {
+      use testServer = TestServer.create()
+      use client = testServer.CreateClient()
+      let! _ = client |> postForm "/v2/notes" [("text","my text")]
+      let! resp= client |> putForm "/v2/notes/1" [("text","my next text")]
+      let! noteJson = resp.Content.ReadAsStringAsync()
+      Expect.equal (parseJson noteJson) (Ok {id=NoteId 1;text="my next text"}) "Expected note json"
+    })
+  ]
