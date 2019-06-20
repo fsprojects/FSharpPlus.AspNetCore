@@ -1,4 +1,4 @@
-﻿module FSharpPlus.AspNetCore.Suave
+module FSharpPlus.AspNetCore.Suave
 open FSharpPlus
 open FSharpPlus.Data
 open Microsoft.AspNetCore.Http
@@ -54,6 +54,9 @@ module Http=
     match from.content with
     | Some content -> to'.WriteAsync(content)
     | _ -> Task.CompletedTask
+  let request apply (a : HttpContext) = apply a.Request a
+  let context apply (a : HttpContext) = apply a a
+
 open Http
 module Writers=
   let private succeed x = async.Return (Some x)

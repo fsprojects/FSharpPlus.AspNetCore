@@ -1,0 +1,228 @@
+module CookieTests
+
+open System
+open System.Net.Http
+open System.Text
+open System.Collections.Generic
+open System.Threading.Tasks
+
+open FSharpPlus
+open FSharpPlus.Data
+
+open Fleece.FSharpData
+open Fleece.FSharpData.Operators
+
+open Microsoft.AspNetCore.Builder
+open Microsoft.AspNetCore.Hosting
+open Microsoft.AspNetCore.Http
+open Microsoft.AspNetCore.TestHost
+
+open Expecto
+
+open FSharp.Control.Tasks.V2
+
+open FSharpPlus.AspNetCore
+open FSharpPlus.AspNetCore.Suave
+open FSharpPlus.AspNetCore.Suave.Http
+open FSharpPlus.AspNetCore.Session.Suave
+open HttpAdapter
+open Successful
+open RequestErrors
+open Filters
+open Writers
+
+(*
+let webApp () =
+  WebPart.choose [ path "/session"
+                      >=> statefulForSession // Session.State.CookieStateStore
+                      >=> context (fun x ->
+                        match HttpContext.state x with
+                        | None ->
+                          // restarted server without keeping the key; set key manually?
+                          let msg = "Server Key, Cookie Serialiser reset, or Cookie Data Corrupt, "
+                                    + "if you refresh the browser page, you'll have gotten a new cookie."
+                          OK msg
+
+                        | Some store ->
+                          match store.get "counter" with
+                          | Some y ->
+                            store.set "counter" (y + 1)
+                            >=> OK (sprintf "Hello %d time(s)" (y + 1) )
+                          | None ->
+                            store.set "counter" 1
+                            >=> OK "First time") ]
+module HttpAdapter=
+
+  let configuration (app: IApplicationBuilder)=
+    let webApp=webApp ()
+    app
+      |> appMap "/" (Suave.appRun webApp)
+      |> ignore
+*)
+
+
+let sessionState f =
+  context( fun r ->
+    match Http.Context.state r with
+    | None ->  RequestErrors.BAD_REQUEST "damn it"
+    | Some store -> f store )
+
+[<Tests>]
+let authTests cfg =
+  let runWithConfig = runWith { cfg with logger = Targets.create Warn [||] }
+  testList "auth tests" [
+    testCase "baseline, no auth cookie" <| fun _ ->
+      let ctx = runWithConfig (OK "ACK")
+      let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
+      Assert.Null("should not have auth cookie", cookies.[SessionAuthCookie])
+
+    testCase "can set cookie" <| fun _ ->
+      let ctx = runWithConfig (authenticated Session false >=> OK "ACK")
+      let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
+      Expect.isNotNull cookies.[SessionAuthCookie] "Should have auth cookie"
+
+    testCase "can set MaxAge cookie" <| fun _ ->
+      let timespan = System.TimeSpan.FromDays(13.0)
+      let maxAge = Cookie.CookieLife.MaxAge timespan
+      let ctx = runWithConfig (authenticated maxAge false >=> OK "ACK")
+      let cookies = ctx |> reqCookies' HttpMethod.GET "/"  None
+      Expect.isNotNull cookies.[SessionAuthCookie] "should have auth cookie"
+
+    testCase "can access session id when authenticate" <| fun _ ->
+      let readSessionId = context (HttpContext.sessionId >> function
+        | None -> OK "no session id"
+        | Some _ -> OK "session id found")
+      let res =
+        runWithConfig (authenticated Session false >=> readSessionId)
+        |> req HttpMethod.GET "/" None
+      Expect.equal res "session id found" "should find session id"
+
+    testCase "can access authenticated contents when authenticate, and not after deauthenticate" <| fun _ ->
+      // given
+      let ctx =
+        runWithConfig (
+          choose [
+            path "/" >=> OK "root"
+            path "/auth" >=> authenticated Session false >=> OK "authed"
+            path "/protected"
+              >=> authenticate Session false
+                               (fun () ->
+                                 Choice2Of2(FORBIDDEN "please authenticate"))
+                               (fun _ -> Choice2Of2(BAD_REQUEST "did you fiddle with our cipher text?"))
+                               (OK "You have reached the place of your dreams!")
+            path "/deauth" >=> deauthenticate >=> OK "deauthed"
+            NOT_FOUND "arghhh"
+            ])
+
+      // mutability bonanza here:
+      let container = CookieContainer()
+      let interact methd resource = interact methd resource container ctx
+      let cookies = cookies ctx.suaveConfig container
+
+      // when
+      interaction ctx <| fun _ ->
+        use res = interact HttpMethod.GET "/"
+        let actual = contentString res
+        Expect.equal actual "root" "should allow root request"
+
+        match cookies.[SessionAuthCookie] with
+        | null -> ()
+        | cookie -> Tests.failtestf "should not have auth cookie, but was %A" cookie
+
+        use res' = interact HttpMethod.GET "/protected"
+        Expect.equal (contentString res') "please authenticate" "should not have access to protected"
+        Expect.equal (statusCode res') HttpStatusCode.Forbidden "code 403 FORBIDDEN"
+
+        use res'' = interact HttpMethod.GET "/auth"
+        Assert.Contains("after authentication", (fun (str : string) -> str.Contains("auth=")),
+                                                res''.Headers.GetValues "Set-Cookie")
+        Expect.equal (contentString res'') "authed" "after authentication"
+
+        use res''' = interact HttpMethod.GET "/protected"
+        Expect.equal (contentString res''') "You have reached the place of your dreams!" "should have access to protected"
+        Expect.equal (statusCode res''') HttpStatusCode.OK "code 200 OK"
+
+        use res'''' = interact HttpMethod.GET "/deauth"
+        Expect.equal (contentString res'''') "deauthed" "should have logged out now"
+
+        use res''''' = interact HttpMethod.GET "/protected"
+        Expect.equal (contentString res''''') "please authenticate" "should not have access to protected after logout"
+
+    testCase "test session is maintained across requests" <| fun _ ->
+      // given
+      let ctx =
+        runWithConfig (
+          statefulForSession
+          >=> sessionState (fun store ->
+              match store.get "counter" with
+              | Some y ->
+                store.set "counter" (y + 1)
+                >=> OK ((y + 1).ToString())
+              | None ->
+                store.set "counter" 0
+                >=> OK "0"))
+
+      let container = CookieContainer()
+      let interact methd resource = interact methd resource container ctx
+
+      interaction ctx  (fun _ ->
+        use res = interact HttpMethod.GET "/"
+        Expect.equal (contentString res) "0" "should return number zero"
+
+        use res' = interact HttpMethod.GET "/"
+        Expect.equal (contentString res') "1" "should return number one"
+
+        use res'' = interact HttpMethod.GET "/"
+        Expect.equal (contentString res'') "2" "should return number two")
+
+    testCase "set more than one variable in the session" <| fun _ ->
+      // given
+      let ctx =
+        runWithConfig (
+          statefulForSession
+          >=> choose [
+            path "/a"     >=> sessionState (fun state -> state.set "a" "a" >=> OK "a" )
+            path "/b"     >=> sessionState (fun state -> state.set "b" "b" >=> OK "b" )
+            path "/get_a" >=> sessionState (fun state -> match state.get "a" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail")
+            path "/get_b" >=> sessionState (fun state -> match state.get "b" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail" )
+            ])
+
+      let container = CookieContainer()
+      let interact methd resource = interact methd resource container ctx
+
+      interaction ctx  (fun _ ->
+        use res = interact HttpMethod.GET "/a"
+        Expect.equal (contentString res) "a" "should return a"
+
+        use res' = interact HttpMethod.GET "/b"
+        Expect.equal (contentString res') "b" "should return b"
+
+        use res'' = interact HttpMethod.GET "/get_a"
+        Expect.equal (contentString res'') "a" "should return a"
+
+        use res''' = interact HttpMethod.GET "/get_b"
+        Expect.equal (contentString res''') "b" "should return b")
+
+    testCase "set two session values on the same request" <| fun _ ->
+      // given
+      let ctx =
+        runWithConfig (
+          statefulForSession >=> choose [
+            path "/ab"     >=> sessionState (fun state -> state.set "a" "a" >=> sessionState ( fun state' -> state'.set "b" "b" >=> OK "a" ))
+            path "/get_a" >=> sessionState (fun state -> match state.get "a" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail")
+            path "/get_b" >=> sessionState (fun state -> match state.get "b" with Some a -> OK a | None -> RequestErrors.BAD_REQUEST "fail" )
+            ])
+
+      let container = CookieContainer()
+      let interact methd resource = interact methd resource container ctx
+
+      interaction ctx  (fun _ ->
+        use res = interact HttpMethod.GET "/ab"
+        Expect.equal (contentString res) "a" "should return a"
+
+        use res''' = interact HttpMethod.GET "/get_b"
+        Expect.equal (contentString res''') "b" "should return b"
+
+        use res'' = interact HttpMethod.GET "/get_a"
+        Expect.equal (contentString res'') "a" "should return a")
+    ]
