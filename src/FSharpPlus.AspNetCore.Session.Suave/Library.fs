@@ -5,6 +5,8 @@ open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.Session
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Builder
+open FSharpPlus.AspNetCore.Suave
+open FSharpPlus.AspNetCore.Suave.Http
 open System.Net
 open System.Text
 open System

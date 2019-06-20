@@ -16,6 +16,7 @@
     <ItemGroup>
         <ProjectReference Include="../../src/FSharpPlus.AspNetCore/FSharpPlus.AspNetCore.fsproj" />
         <ProjectReference Include="../../src/FSharpPlus.AspNetCore.Suave/FSharpPlus.AspNetCore.Suave.fsproj" />
+        <ProjectReference Include="..\..\src\FSharpPlus.AspNetCore.Session.Suave\FSharpPlus.AspNetCore.Session.Suave.fsproj" />
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="2.1.1" />

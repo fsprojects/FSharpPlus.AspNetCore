@@ -54,8 +54,8 @@ module Http=
     match from.content with
     | Some content -> to'.WriteAsync(content)
     | _ -> Task.CompletedTask
-  let request apply (a : HttpContext) = apply a.Request a
-  let context apply (a : HttpContext) = apply a a
+  let request apply (a : Context) = apply a.request a
+  let context apply (a : Context) = apply a a
 
 open Http
 module Writers=
