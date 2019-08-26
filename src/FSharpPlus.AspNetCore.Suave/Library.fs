@@ -1,6 +1,7 @@
 ﻿module FSharpPlus.AspNetCore.Suave
 open FSharpPlus
 open FSharpPlus.Data
+open FSharpPlus.Control
 open Microsoft.AspNetCore.Http
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Builder
@@ -8,7 +9,6 @@ open System.Net
 open System.Text
 open System
 open System.Text.RegularExpressions
-open FSharp.Scanf.Optimized
 
 // setup something that reminds us of what Suave can work with
 // this is an overly simplified model of Suave in order to show how OptionT can be used
@@ -98,42 +98,15 @@ module Filters=
   let OPTIONS (x : Http.Context) = response "OPTIONS" x
   let PATCH (x : Http.Context) = response "PATCH" x
   let path s = let path = implicit s in OptionT << fun (x : Http.Context) -> async.Return (if (path = x.request.Path) then Some x else None)
-  /// note: This implementation is smaller in scope than you'd find in Giraffe or Suave
-  /// I'd prefer to use some sort of library to turn path into a match expression
-  [<Obsolete("please use pathScan")>]
-  let inline pathRegex (path) (routeHandler : 'T -> WebPart<Context>) : WebPart<Context>=
-    let regex =Regex("^"+path+"$", RegexOptions.IgnoreCase)
-    let tryMatchInput = fun v->
-      let m = regex.Match v
-      if m.Success then tryParse m.Groups.[1].Value else None
-    fun (x : Http.Context) -> monad {
-      let pathValue = x.request.Path.Value
-      match tryMatchInput pathValue with
-      | Some args -> return! routeHandler args x
-      | None -> return! WebPart.fail x
-    }
-  /// note: This implementation is smaller in scope than you'd find in Giraffe or Suave
-  /// I'd prefer to use some sort of library to turn path into a match expression
-  [<Obsolete("please use pathScan")>]
-  let inline pathRegex2 (path) (routeHandler : 'T1 -> 'T2 -> WebPart<Context>) : WebPart<Context>=
-    let regex =Regex("^"+path+"$", RegexOptions.IgnoreCase)
-    let tryMatchInput = fun v->
-      let m = regex.Match v
-      if m.Success then (tryParse m.Groups.[1].Value, tryParse m.Groups.[2].Value) else None,None
-    fun (x : Http.Context) -> monad {
-      let pathValue = x.request.Path.Value
-      match tryMatchInput pathValue with
-      | Some args1, Some args2 -> return! routeHandler args1 args2 x
-      | _ -> return! WebPart.fail x
-    }
 
   let inline pathScan (path) (routeHandler) : WebPart<Context>=
     fun (x : Http.Context) ->
       if x.request.Path.HasValue then
-        try ksscanf path (fun p->routeHandler p x) x.request.Path.Value with | _ -> WebPart.fail x
+        match trySscanf path x.request.Path.Value with
+        | Some p ->routeHandler p x
+        | _ -> WebPart.fail x
       else
         WebPart.fail x
-
 
 module Request =
   module Form=
