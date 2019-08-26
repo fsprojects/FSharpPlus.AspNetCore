@@ -1,7 +1,6 @@
 ﻿module FSharpPlus.AspNetCore.Suave
 open FSharpPlus
 open FSharpPlus.Data
-open FSharpPlus.Control
 open Microsoft.AspNetCore.Http
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Builder
@@ -101,12 +100,9 @@ module Filters=
 
   let inline pathScan (path) (routeHandler) : WebPart<Context>=
     fun (x : Http.Context) ->
-      if x.request.Path.HasValue then
-        match trySscanf path x.request.Path.Value with
-        | Some p ->routeHandler p x
-        | _ -> WebPart.fail x
-      else
-        WebPart.fail x
+      match trySscanf path <| implicit x.request.Path with
+      | Some p ->routeHandler p x
+      | _ -> WebPart.fail x
 
 module Request =
   module Form=
