@@ -100,7 +100,7 @@ module Filters=
 
   let inline pathScan (path) (routeHandler) : WebPart<Context>=
     fun (x : Http.Context) ->
-      match trySscanf path <| implicit x.request.Path with
+      match implicit x.request.Path |> trySscanf path with
       | Some p ->routeHandler p x
       | _ -> WebPart.fail x
 
