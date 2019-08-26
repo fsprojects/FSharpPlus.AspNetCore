@@ -107,7 +107,7 @@ let webApp (db: IDb) =
       let! maybeNote = lift (db.GetNote <| NoteId id)
       return! Json.OK (toJson maybeNote) ctx
     })
-  let getNotePart (id:int) (part:int)=
+  let getNotePart (id:int, part:int)=
     GET >=> (fun ctx -> monad {
       let! maybeNote = lift (db.GetNote <| NoteId id)
       let json = maybeNote |> map(fun (n:Note)-> n.text.Substring(0,part)) |> toJson
@@ -135,8 +135,8 @@ let webApp (db: IDb) =
   let v1=
     WebPart.choose [ path "/" >=> (OK "/")
                      path "/notes" >=> register
-                     pathRegex "/notes/(\\d+)" getNote
-                     pathRegex2 "/notes/(\\d+)/_/(\\d+)" getNotePart
+                     pathScan "/notes/%d" getNote
+                     pathScan "/notes/%d/_/%d" getNotePart
                      path "/notes" >=> overview ]
   let v2=
     WebPart.choose [ path "/" >=> (OK "/")
