@@ -1,4 +1,4 @@
-﻿module FSharpPlus.AspNetCore.Suave
+module FSharpPlus.AspNetCore.Suave
 open FSharpPlus
 open FSharpPlus.Data
 open Microsoft.AspNetCore.Http
@@ -117,7 +117,9 @@ module Request =
       | _       -> None
   module Header=
     let tryGet key (r:HttpRequest)=match r.Headers.TryGetValue key with | (true,v)->Some v | _-> None
-
+  module Cookie=
+    let t k (r:HttpRequest)=
+      r.Cookies
 
 
 open FSharp.Control.Tasks.V2
