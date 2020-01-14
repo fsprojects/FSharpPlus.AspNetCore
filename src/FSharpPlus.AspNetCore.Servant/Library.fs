@@ -1,4 +1,4 @@
-namespace FSharpPlus.AspNetCore.Servant
+module FSharpPlus.AspNetCore.Servant
 open FSharpPlus
 open FSharpPlus.Data
 open Microsoft.AspNetCore.Http
@@ -100,11 +100,25 @@ module Filters=
 
   let inline pathScan (path) (routeHandler) : WebPart<Context>=
     fun (x : Http.Context) ->
-      if x.request.Path.HasValue then
-        try ksscanf path (fun p->routeHandler p x) x.request.Path.Value with | _ -> WebPart.fail x
-      else
-        WebPart.fail x
+      match string x.request.Path |> trySscanf path with
+      | Some p ->routeHandler p x
+      | _ -> WebPart.fail x
 
+type Router'< 'env, 'a> =
+  /// the map contains routers for subpaths (first path component used
+  /// for lookup and removed afterwards), the list contains handlers
+  /// for the empty path, to be tried in order
+  | StaticRouter of Map<String, Router'<'env,'a>> * ('env -> 'a)
+  /// first path component is passed to the child router in its
+  /// environment and removed afterwards
+  | CaptureRouter of Router'<String*'env,'a>
+  /// all path components are passed to the child router in its
+  /// environment and are removed afterwards
+  | CaptureAllRouter of Router'<List<String>*'env,'a>
+  /// to be used for routes we do not know anything about
+  | RawRouter     of ('env -> 'a)
+  /// left-biased choice between two routers
+  | Choice of Router'< 'env, 'a> * Router'< 'env, 'a>
 
 module Request =
   module Form=
