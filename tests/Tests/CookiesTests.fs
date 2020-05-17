@@ -28,8 +28,13 @@ open Successful
 open RequestErrors
 open Filters
 open Writers
+let sessionState f =
+  context( fun r ->
+    match Http.Context.state r with
+    | None ->  RequestErrors.BAD_REQUEST "damn it"
+    | Some store -> f store )
 
-let webpart () = 
+let webpart () =
   WebPart.choose [ path "/" >=> (OK "/")
                    path "/session"
                     >=> statefulForSession // Session.State.CookieStateStore

@@ -44,16 +44,22 @@ module Http=
   type Context = { request:HttpRequest; response:Response }
   module Response=
     let empty = { statusCode=None; content=None; contentType=None ; headers=Map.empty}
+  //module Sesssion=
+  //  let
   module Context=
     let ofHttpContext (httpContext:HttpContext)=
       { request = httpContext.Request; response = Response.empty }
+    //let state (c:Context)= match c.request.HttpContext.Session.TryGetValue "_state" with | true,v-> Some v | _ -> None
   let yieldToResponse (from:Response) (to':HttpResponse)=
     match from.contentType with | Some contentType -> to'.ContentType <- contentType | _ -> ()
     match from.statusCode with | Some statusCode -> to'.StatusCode <- statusCode | _ -> ()
     match from.content with
     | Some content -> to'.WriteAsync(content)
     | _ -> Task.CompletedTask
+
 open Http
+let context apply (a : Context) = apply a a
+
 module Writers=
   let private succeed x = async.Return (Some x)
 
@@ -117,10 +123,6 @@ module Request =
       | _       -> None
   module Header=
     let tryGet key (r:HttpRequest)=match r.Headers.TryGetValue key with | (true,v)->Some v | _-> None
-  module Cookie=
-    let t k (r:HttpRequest)=
-      r.Cookies
-
 
 open FSharp.Control.Tasks.V2
 let appRun (app:WebPart<Context>) (appBuilder:IApplicationBuilder)=
