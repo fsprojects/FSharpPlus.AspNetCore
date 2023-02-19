@@ -8,6 +8,9 @@ EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FSharpPlus.AspNetCore", "src\FSharpPlus.AspNetCore\FSharpPlus.AspNetCore.fsproj", "{5D30E174-2538-47AC-8443-318C8C5DC2C9}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{ACBEE43C-7A88-4FB1-9B06-DB064D22B29F}"
+	ProjectSection(SolutionItems) = preProject
+		tests\Notes.http = tests\Notes.http
+	EndProjectSection
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tests", "tests\Tests\Tests.fsproj", "{1CA2E092-2320-451D-A4F0-9ED7C7C528CA}"
 EndProject
