@@ -19,8 +19,6 @@ open Microsoft.AspNetCore.TestHost
 
 open Expecto
 
-open FSharp.Control.Tasks.V2
-
 open FSharpPlus.AspNetCore
 open FSharpPlus.AspNetCore.Suave
 open HttpAdapter

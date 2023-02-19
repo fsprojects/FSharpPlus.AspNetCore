@@ -2,7 +2,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <TargetFrameworks>netcoreapp2.1</TargetFrameworks>
+        <TargetFrameworks>net7</TargetFrameworks>
     </PropertyGroup>
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
         <DebugType>embedded</DebugType>
@@ -17,7 +17,7 @@
         <ProjectReference Include="../../src/FSharpPlus.AspNetCore.Suave/FSharpPlus.AspNetCore.Suave.fsproj" />
     </ItemGroup>
     <ItemGroup>
-        <PackageReference Update="FSharp.Core" Version="4.6.2" />
+        <PackageReference Update="FSharp.Core" Version="7.0.200" />
         <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="2.1.1" />
         <PackageReference Include="Fleece.FSharpData" Version="0.8.0" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.7.2" />

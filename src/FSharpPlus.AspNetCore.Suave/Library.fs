@@ -7,6 +7,7 @@ open Microsoft.AspNetCore.Builder
 open System.Net
 open System.Text
 open System
+open System.IO
 open System.Text.RegularExpressions
 
 // setup something that reminds us of what Suave can work with
@@ -120,7 +121,6 @@ module Request =
 
 
 
-open FSharp.Control.Tasks.V2
 let appRun (app:WebPart<Context>) (appBuilder:IApplicationBuilder)=
   let appRun (func:HttpContext->#Task) (b: IApplicationBuilder) =
     b.Run(RequestDelegate(fun ctx->func ctx :> Task))
