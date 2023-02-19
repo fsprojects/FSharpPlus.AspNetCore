@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <RootNamespace>Todos</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/FSharpPlus.AspNetCore/FSharpPlus.AspNetCore.fsproj" />
+    <ProjectReference Include="../../src/FSharpPlus.AspNetCore.Suave/FSharpPlus.AspNetCore.Suave.fsproj" />
+    <PackageReference Include="Fleece.FSharpData" Version="0.10.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Main.fs" />
+  </ItemGroup>
+</Project>

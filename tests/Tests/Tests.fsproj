@@ -7,19 +7,20 @@
     <GenerateProgramFile>false</GenerateProgramFile>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Tests.fs"/>
-    <Compile Include="Main.fs"/>
+    <Compile Include="Tests.fs" />
+    <Compile Include="Main.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../src/FSharpPlus.AspNetCore/FSharpPlus.AspNetCore.fsproj"/>
-    <ProjectReference Include="../../src/FSharpPlus.AspNetCore.Suave/FSharpPlus.AspNetCore.Suave.fsproj"/>
+    <ProjectReference Include="../../src/FSharpPlus.AspNetCore/FSharpPlus.AspNetCore.fsproj" />
+    <ProjectReference Include="../../src/FSharpPlus.AspNetCore.Suave/FSharpPlus.AspNetCore.Suave.fsproj" />
+    <ProjectReference Include="..\Notes\Notes.fsproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Update="FSharp.Core" Version="7.0.200"/>
-    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="7.0.3"/>
-    <PackageReference Include="Fleece.FSharpData" Version="0.10.0"/>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.4.1"/>
-    <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.13.3"/>
-    <PackageReference Include="Expecto" Version="9.0.4"/>
+    <PackageReference Update="FSharp.Core" Version="7.0.200" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="7.0.3" />
+    <PackageReference Include="Fleece.FSharpData" Version="0.10.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.4.1" />
+    <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.13.3" />
+    <PackageReference Include="Expecto" Version="9.0.4" />
   </ItemGroup>
 </Project>
