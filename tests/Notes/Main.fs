@@ -161,10 +161,9 @@ module HttpAdapter=
     context.Response.WriteAsync(indexHtml)
   let configuration (svc: IDb) (app: IApplicationBuilder)=
     let (webAppV1,webAppV2)=webApp svc
-    app
-      |> appMap "/index.html" (appRun index)
-      |> appMap "/v1" (Suave.appRun webAppV1)
-      |> appMap "/v2" (Suave.appRun webAppV2)
+    app.Map("/index.html",fun app ->app.Run(index))
+       .Map("/v1",Suave.appRun webAppV1)
+       .Map("/v2",Suave.appRun webAppV2)
       |> ignore
 [<EntryPoint>]
 let main argv =
