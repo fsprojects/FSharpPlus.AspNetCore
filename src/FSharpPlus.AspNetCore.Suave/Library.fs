@@ -26,12 +26,6 @@ type HeaderKey(key: string) =
       let other = otherObject :?> HeaderKey
       this.ToLowerInvariant().CompareTo(other.ToLowerInvariant())
 module WebPart=
-  /// Comment from <a href="https://github.com/SuaveIO/suave/blob/v2.4.3/src/Suave/WebPart.fsi#L39-L42">WebPart.fsi</a>
-  /// Entry-point for composing the applicative routes of the http application,
-  /// by iterating the options, applying the context, arg, to the predicate
-  /// from the list of options, until there's a match/a Some(x) which can be
-  /// run.
-  let choose (options : WebPart<'a> list) = fun x -> choice (List.map ((|>) x) options)
   let inline fail (_:'a) : OptionT<Async<'a option>> = OptionT <| async.Return None
 
 module Http=

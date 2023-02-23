@@ -129,17 +129,17 @@ let webApp (db: IDb) =
         return! BAD_REQUEST "Could not find text" ctx
     })
   let v1=
-    WebPart.choose [ path "/" >=> (OK "/")
-                     path "/notes" >=> register
-                     pathScan "/notes/%d" getNote
-                     pathScan "/notes/%d/_/%d" getNotePart
-                     path "/notes" >=> overview ]
+    choice [ path "/" >=> (OK "/")
+             path "/notes" >=> register
+             pathScan "/notes/%d" getNote
+             pathScan "/notes/%d/_/%d" getNotePart
+             path "/notes" >=> overview ]
   let v2=
-    WebPart.choose [ path "/" >=> (OK "/")
-                     path "/notes" >=> register
-                     pathScan "/notes/%d" getNote
-                     pathScan "/notes/%d" updateNote
-                     path "/notes" >=> overview ]
+    choice [ path "/" >=> (OK "/")
+             path "/notes" >=> register
+             pathScan "/notes/%d" getNote
+             pathScan "/notes/%d" updateNote
+             path "/notes" >=> overview ]
   (v1,v2)
 module HttpAdapter=
   let indexHtml = """
