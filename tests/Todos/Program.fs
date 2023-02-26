@@ -19,8 +19,7 @@ open Swashbuckle.AspNetCore.Annotations
 open Swashbuckle.AspNetCore.Swagger
 open Microsoft.AspNetCore.Http
 
-[<RequireQualifiedAccess>]
-type TodoStatus = ``waiting``| ``working`` | ``done``
+type TodoStatus = ``waiting`` = 0 | ``working`` = 1 | ``done`` = 2
 type Todo = {id:int64; title:string; create_date: DateTime; done_date: Nullable<DateTime>; status: TodoStatus}
 module Todos=
   let register (app:WebApplication) =
