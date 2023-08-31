@@ -1,0 +1,22 @@
+### Create note 
+# auth: echo "{\"sub\":\"1\"}" | openssl base64 
+POST http://localhost:5191/v1/notes
+Content-Type: application/x-www-form-urlencoded
+x-jwt-payload: eyJzdWIiOiIxIn0K 
+
+text=my%20text
+
+### Get notes
+
+GET http://localhost:5191/v1/notes
+Accept: application/json
+x-jwt-payload: eyJzdWIiOiIxIn0K
+
+### Get note
+
+GET http://localhost:5191/v1/notes/1
+Accept: application/json
+x-jwt-payload: eyJzdWIiOiIxIn0K
+
+
+

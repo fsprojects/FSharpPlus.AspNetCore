@@ -1,27 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
-    <PropertyGroup>
-        <OutputType>Exe</OutputType>
-        <TargetFrameworks>netcoreapp2.1</TargetFrameworks>
-    </PropertyGroup>
-    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
-        <DebugType>embedded</DebugType>
-    </PropertyGroup>
-
-    <ItemGroup>
-        <Compile Include="Tests.fs" />
-        <Compile Include="Main.fs" />
-    </ItemGroup>
-    <ItemGroup>
-        <ProjectReference Include="../../src/FSharpPlus.AspNetCore/FSharpPlus.AspNetCore.fsproj" />
-        <ProjectReference Include="../../src/FSharpPlus.AspNetCore.Suave/FSharpPlus.AspNetCore.Suave.fsproj" />
-    </ItemGroup>
-    <ItemGroup>
-        <PackageReference Update="FSharp.Core" Version="4.6.2" />
-        <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="2.1.1" />
-        <PackageReference Include="Fleece.FSharpData" Version="0.8.0" />
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.7.2" />
-        <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.5.0" />
-        <PackageReference Include="Expecto" Version="8.0.0" />
-    </ItemGroup>
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net7</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <GenerateProgramFile>false</GenerateProgramFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Tests.fs" />
+    <Compile Include="Main.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/FSharpPlus.AspNetCore/FSharpPlus.AspNetCore.fsproj" />
+    <ProjectReference Include="../../src/FSharpPlus.AspNetCore.Suave/FSharpPlus.AspNetCore.Suave.fsproj" />
+    <ProjectReference Include="..\Notes\Notes.fsproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="7.0.200" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="7.0.3" />
+    <PackageReference Include="Fleece.FSharpData" Version="0.10.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.4.1" />
+    <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.13.3" />
+    <PackageReference Include="Expecto" Version="9.0.4" />
+  </ItemGroup>
 </Project>
