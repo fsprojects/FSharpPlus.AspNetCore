@@ -27,7 +27,8 @@ module Todos=
            .WithMetadata(
             SwaggerOperationAttribute(summary="get all todos"),
             SwaggerResponseAttribute(200, "success", typeof<Todo>))
-           .WithName("GetTodos")
+           .WithName("GetTodos").WithTags("Todos")
+           .WithDisplayName("GetTodos")
            .WithOpenApi()
 
         app.MapPost("/todos",handler=Func<_>(fun r->Task.CompletedTask))
@@ -35,7 +36,7 @@ module Todos=
             SwaggerOperationAttribute(summary="create todo"),
             SwaggerResponseAttribute(200, "success", typeof<Todo>),
             SwaggerResponseAttribute(400, ""))
-           .WithName("PostTodo")
+           .WithName("PostTodo").WithTags("Todos")
            .WithOpenApi().Accepts<Todo>("application/json")
 
 module WeatherForecasts=
@@ -50,7 +51,7 @@ module WeatherForecasts=
           summaries[Random.Shared.Next(summaries.Length)] )
         let weatherForecast () = seq { 1 .. 5 } |> Seq.map forecast
         app.MapGet("/weatherforecast", handler=Func<_>( weatherForecast ))
-           .WithName("GetWeatherForecast").WithOpenApi()
+           .WithName("GetWeatherForecast").WithOpenApi().WithTags("WeatherForecast")
 
 module Program =
     let exitCode = 0
