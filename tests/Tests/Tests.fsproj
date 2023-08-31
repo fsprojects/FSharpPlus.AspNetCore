@@ -7,12 +7,14 @@
     <GenerateProgramFile>false</GenerateProgramFile>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="InterpreterTests.fs" />
     <Compile Include="Tests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/FSharpPlus.AspNetCore/FSharpPlus.AspNetCore.fsproj" />
     <ProjectReference Include="../../src/FSharpPlus.AspNetCore.Suave/FSharpPlus.AspNetCore.Suave.fsproj" />
+    <ProjectReference Include="..\..\src\FSharpPlus.AspNetCore.Interpreter\FSharpPlus.AspNetCore.Interpreter.fsproj" />
     <ProjectReference Include="..\Notes\Notes.fsproj" />
   </ItemGroup>
   <ItemGroup>

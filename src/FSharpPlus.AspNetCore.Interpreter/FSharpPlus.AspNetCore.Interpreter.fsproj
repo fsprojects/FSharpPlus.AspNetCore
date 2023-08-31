@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net7</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Title>FSharpPlus.AspNetCore.Suave</Title>
+    <Description>F#+ bindings for asp.net core. This is intended to enable development of web api:s leveraging F#+ and asp.net core. It's in the style of Suave.</Description>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <Optimize>true</Optimize>
+    <Tailcalls>true</Tailcalls>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Library.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+      <PackageReference Update="FSharp.Core" Version="7.0.200" />
+      <PackageReference Include="FSharpPlus" Version="1.4.0" />
+      <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+</Project>
