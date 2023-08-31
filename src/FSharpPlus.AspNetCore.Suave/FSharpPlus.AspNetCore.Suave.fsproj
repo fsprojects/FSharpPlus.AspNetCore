@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFramework>net7</TargetFramework>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
@@ -24,7 +24,6 @@
   <ItemGroup>
       <PackageReference Update="FSharp.Core" Version="7.0.200" />
       <PackageReference Include="FSharpPlus" Version="1.4.0" />
-      <PackageReference Include="Microsoft.AspNetCore.Http" Version="2.2.2" />
-      <PackageReference Include="Microsoft.AspNetCore" Version="2.2.0" />
+      <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 </Project>
