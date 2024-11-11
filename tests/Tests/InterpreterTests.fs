@@ -1,4 +1,4 @@
-module Tests.InterpreterTests
+module InterpreterTests
 
 
 open System
@@ -103,7 +103,7 @@ module ``integration test using test server`` =
       })
     ]
   [<Tests>]
-  let testsV1 = testList "integration test api v1" <| testFixture 1 @ [
+  let testsV1 = testList "(interpret) integration test api v1" <| testFixture 1 @ [
     testCase "Read a part of a note" <| fun _ ->waitFor(task {
       use testServer = TestServer.create()
       use client = testServer.CreateClient()
@@ -115,7 +115,7 @@ module ``integration test using test server`` =
   ]
 
   [<Tests>]
-  let testsV2 = testList "integration test api v2" <| testFixture 2 @ [
+  let testsV2 = testList "(interpret) integration test api v2" <| testFixture 2 @ [
     testCase "Update a note" <| fun _ ->waitFor(task {
       use testServer = TestServer.create()
       use client = testServer.CreateClient()
