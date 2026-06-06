@@ -25,6 +25,10 @@ open FSharpPlus.AspNetCore.Suave
 open Notes
 
 module ``integration test using test server`` =
+  let tryParseInt (s:string) =
+    match Int32.TryParse s with
+    | true, n -> Some n
+    | _ -> None
   module TestServer=
     let fakeDb() =
       let withUserId userId = (=) userId << fst
@@ -138,7 +142,7 @@ module ``integration test using test server`` =
             let current =
               store
               |> FSharpPlus.AspNetCore.Suave.Session.tryGet "counter"
-              |> Option.bind (fun s -> match Int32.TryParse s with | true, n -> Some n | _ -> None)
+              |> Option.bind tryParseInt
               |> Option.defaultValue 0
             store |> FSharpPlus.AspNetCore.Suave.Session.set "counter" (string (current + 1))
             Successful.OK (sprintf "Hello %d time(s)" (current + 1)) ctx
@@ -161,7 +165,7 @@ module ``integration test using test server`` =
       let! firstContent = first.Content.ReadAsStringAsync()
       let cookieHeader =
         first.Headers.GetValues("Set-Cookie")
-        |> Seq.map (fun cookie -> cookie.Split(';').[0])
+        |> Seq.choose (fun cookie -> cookie.Split(';') |> Array.tryHead)
         |> String.concat "; "
 
       let request = new HttpRequestMessage(HttpMethod.Get, "http://localhost/session")

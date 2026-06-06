@@ -9,6 +9,7 @@ open System.Text
 open System
 open System.IO
 open System.Text.RegularExpressions
+open Microsoft.AspNetCore.Http.Features
 
 // setup something that reminds us of what Suave can work with
 // this is an overly simplified model of Suave in order to show how OptionT can be used
@@ -87,10 +88,15 @@ module RequestErrors=
   let FORBIDDEN s = setStatusAndContent (int HttpStatusCode.Forbidden) s
   let NOT_FOUND s = setStatusAndContent (int HttpStatusCode.NotFound) s
   let UNAUTHORIZED s = setStatusAndContent (int HttpStatusCode.Unauthorized) s
+let private tryGetSession (ctx:Context) =
+  match ctx.request.HttpContext.Features.Get<ISessionFeature>() with
+  | null -> None
+  | feature when isNull feature.Session -> None
+  | feature -> Some feature.Session
 module Filters=
   let response (method : string) = OptionT << fun (x : Context) -> async.Return (if (method = x.request.Method) then Some x else None)
   let hasFormContentType = OptionT << fun (x : Context) -> async.Return (if x.request.HasFormContentType then Some x else None)
-  let statefulForSession = OptionT << fun (x : Context) -> async.Return (Some x)
+  let statefulForSession = OptionT << fun (x : Context) -> async.Return (if tryGetSession x |> Option.isSome then Some x else None)
 
   let GET  (x : Http.Context) =  response "GET" x
   let POST (x : Http.Context) = response "POST" x
@@ -127,12 +133,7 @@ module Request =
       | _ -> None
 
 module HttpContext=
-  let state (ctx:Context) =
-    try
-      let session = ctx.request.HttpContext.Session
-      Some session
-    with
-    | :? InvalidOperationException -> None
+  let state (ctx:Context) = tryGetSession ctx
 
 module Session=
   let tryGet key (session:ISession) =
