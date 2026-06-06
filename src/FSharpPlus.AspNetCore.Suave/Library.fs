@@ -90,6 +90,7 @@ module RequestErrors=
 module Filters=
   let response (method : string) = OptionT << fun (x : Context) -> async.Return (if (method = x.request.Method) then Some x else None)
   let hasFormContentType = OptionT << fun (x : Context) -> async.Return (if x.request.HasFormContentType then Some x else None)
+  let statefulForSession = OptionT << fun (x : Context) -> async.Return (Some x)
 
   let GET  (x : Http.Context) =  response "GET" x
   let POST (x : Http.Context) = response "POST" x
@@ -119,6 +120,27 @@ module Request =
       | _       -> None
   module Header=
     let tryGet key (r:HttpRequest)=match r.Headers.TryGetValue key with | (true,v)->Some v | _-> None
+  module Cookie=
+    let tryGet key (r:HttpRequest)=
+      match r.Cookies.TryGetValue key with
+      | true, v -> Some v
+      | _ -> None
+
+module HttpContext=
+  let state (ctx:Context) =
+    try
+      let session = ctx.request.HttpContext.Session
+      Some session
+    with
+    | :? InvalidOperationException -> None
+
+module Session=
+  let tryGet key (session:ISession) =
+    match session.GetString key with
+    | null -> None
+    | value -> Some value
+  let set key value (session:ISession) =
+    session.SetString(key, value)
 
 
 
@@ -134,4 +156,3 @@ let appRun (app:WebPart<Context>) (appBuilder:IApplicationBuilder)=
     | None -> return! Task.CompletedTask
   }
   appRun runApp appBuilder
-
