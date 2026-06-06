@@ -16,6 +16,7 @@ open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Http
 open Microsoft.AspNetCore.TestHost
+open Microsoft.Extensions.DependencyInjection
 
 open Expecto
 
@@ -24,6 +25,10 @@ open FSharpPlus.AspNetCore.Suave
 open Notes
 
 module ``integration test using test server`` =
+  let tryParseInt (s:string) =
+    match Int32.TryParse s with
+    | true, n -> Some n
+    | _ -> None
   module TestServer=
     let fakeDb() =
       let withUserId userId = (=) userId << fst
@@ -124,3 +129,51 @@ module ``integration test using test server`` =
       Expect.equal (parseJson noteJson) (Ok {id=NoteId 1;text="my next text"}) "Expected note json"
     })
   ]
+
+  [<Tests>]
+  let ``session state uses cookie`` =
+    testCase "counter is incremented across requests with same cookie" <| fun _ -> waitFor(task {
+      let sessionWebPart =
+        Filters.path "/session"
+        >=> Filters.statefulForSession
+        >=> (fun ctx ->
+          match FSharpPlus.AspNetCore.Suave.HttpContext.state ctx with
+          | Some store ->
+            let current =
+              store
+              |> FSharpPlus.AspNetCore.Suave.Session.tryGet "counter"
+              |> Option.bind tryParseInt
+              |> Option.defaultValue 0
+            store |> FSharpPlus.AspNetCore.Suave.Session.set "counter" (string (current + 1))
+            Successful.OK (sprintf "Hello %d time(s)" (current + 1)) ctx
+          | None ->
+            Successful.OK "No session available" ctx)
+
+      let builder =
+        WebHostBuilder()
+          .ConfigureServices(fun services ->
+            services.AddDistributedMemoryCache() |> ignore
+            services.AddSession() |> ignore)
+          .Configure(fun app ->
+            app.UseSession() |> ignore
+            Suave.appRun sessionWebPart app |> ignore)
+
+      use testServer = new TestServer(builder)
+      use client = testServer.CreateClient()
+
+      let! first = client.GetAsync("http://localhost/session")
+      let! firstContent = first.Content.ReadAsStringAsync()
+      let cookieHeader =
+        first.Headers.GetValues("Set-Cookie")
+        |> Seq.choose (fun cookie -> cookie.Split(';') |> Array.tryHead)
+        |> String.concat "; "
+
+      let request = new HttpRequestMessage(HttpMethod.Get, "http://localhost/session")
+      request.Headers.Add("Cookie", cookieHeader)
+
+      let! second = client.SendAsync(request)
+      let! secondContent = second.Content.ReadAsStringAsync()
+
+      Expect.equal firstContent "Hello 1 time(s)" "Expected first session response"
+      Expect.equal secondContent "Hello 2 time(s)" "Expected second session response"
+    })
